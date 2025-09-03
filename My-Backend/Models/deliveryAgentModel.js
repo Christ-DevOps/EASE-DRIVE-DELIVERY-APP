@@ -1,38 +1,72 @@
-const { required } = require('joi');
+// Models/DeliveryAgentModel.js
 const mongoose = require('mongoose');
 
-const DeliveryAgentModel = mongoose.Schema({
-    vehicleType:{ 
-        type: String,
-        required: true,
+const deliveryAgentSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  //documents
+  documents: {
+    type:[ String]
+  },
+  IDcard: {
+    type: String,
+  },
+  vehicleType:{
+    type: String,
+    default: 'Motor-Bike'
+  },
+  vehicleLicense:{
+    type: String
+  },
+    // GeoJSON Point: { type: 'Point', coordinates: [lng, lat] }
+  currentLocation: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      required: true
     },
-    DrivingLicense: {
-        type: String,
-        required: true
-    },
-    Availability:{
-        type: String,
-        enum: ['Available', 'Unavailable'],
-    },
-    BankAccountNumber: {
-        type: String,
-        required: false
-    },
-    Personalphoto: {
-        type: String,
-        required: true,
-    },
-    IdCardNumber:{
-        type: String,
-        required: true
-    },
-    IdCardImage:{
-        type: String,
-        required: true
+    coordinates: {
+      type: [Number],
+      required: true
     }
+  },
+  availabilityStatus: {
+    type: String,
+    enum: ['available', 'offline'],
+    default: 'available'
+  },
+  currentOrder: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  rating: {
+    type: Number,
+    min: 0,
+    max: 20,
+    default: 4.5
+  },
+  totalDeliveries: {
+    type: Number,
+    default: 0
+  },
+  restaurantID: {
+    type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null
+  },
+    approved: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
 
-}, {
-    timestampes: true
-});
+// Index for geospatial queries
+deliveryAgentSchema.index({ currentLocation: '2dsphere' });
+deliveryAgentSchema.index({ user: 1 });
+deliveryAgentSchema.index({ availabilityStatus: 1 });
+deliveryAgentSchema.index({ approved: 1 });
 
-module.exports = mongoose.model("DeliveryAgent", DeliveryAgentModel);
+module.exports = mongoose.model('DeliveryAgent', deliveryAgentSchema);

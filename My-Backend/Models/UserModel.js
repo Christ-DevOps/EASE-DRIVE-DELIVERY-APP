@@ -3,19 +3,13 @@ const bcrypt = require('bcryptjs');
 
 // ------------------- Nested Schemas -------------------
 const PartnerSchema = mongoose.Schema({
-    companyName: String,
+    foodcategory: [String],
     documents: [String],
+    description: String,
     approved: { type: Boolean, default: false }
 }, { _id: false });
 
-const DeliveryAgentSchema = mongoose.Schema({
-    vehicleType: String,
-    licenseNumber: String,
-    documents: [String],
-    approved: { type: Boolean, default: false }
-}, { _id: false });
-
-// ------------------- Main User Schema -------------------
+// Here is the main User Schema
 const userSchema = mongoose.Schema({
     name: {
         type: String,
@@ -44,12 +38,29 @@ const userSchema = mongoose.Schema({
         enum: ["client", "partner", "delivery_agent", "admin"],
         default: "client"
     },
+    status: {
+        type: String,
+        enum: ["active", "suspended"],
+    },
+    address: {
+        type: String,
+        default: 'Awae Escalier, Yaounde'
+    },
+  location: {
+    type: {
+      type: String,
+      enum: ["Point"],
+      default: "Point"
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      default: [0, 0]
+    }
+  },
     verified: {
         type: Boolean, // Corrected type
         default: true,
     },
-    partnerInfo: PartnerSchema, // Integrated PartnerSchema
-    deliveryInfo: DeliveryAgentSchema, // Integrated DeliveryAgentSchema
     verificationCode: {
         type: String,
         select: false
@@ -71,8 +82,8 @@ const userSchema = mongoose.Schema({
         default: false
     },
       // hashed reset token approach (optional)
-  resetPasswordToken: { type: String, select: false },
-  resetPasswordExpires: { type: Date, select: false }
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false }
 
 }, {
     timestamps: true // A better way to get createdAt and updatedAt
@@ -101,5 +112,12 @@ userSchema.methods.createPasswordResetToken = function () {
     this.resetPasswordExpires = Date.now() + 60 * 60 * 1000;
     return resetToken;
 };
+
+
+// Indexes
+userSchema.index({ location: '2dsphere' }); // for geo queries
+userSchema.index({ email: 1 }); // for faster lookups
+userSchema.index({ phone: 1 }); // for faster lookups
+userSchema.index({ role: 1 }); // for role-based queries
 
 module.exports = mongoose.model("User", userSchema);

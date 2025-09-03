@@ -33,8 +33,8 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
 
   // Defensive defaults: ensure numeric subtotal even if state.total is null/undefined
   const subtotal = Number(state?.total ?? 0);
-  const deliveryFee = 2.99;
-  const taxRate = 0.08;
+  const deliveryFee = 1000; // fixed delivery fee
+  const taxRate = 0;
   const taxAmount = subtotal * taxRate;
   const totalAmount = subtotal + deliveryFee + taxAmount;
 

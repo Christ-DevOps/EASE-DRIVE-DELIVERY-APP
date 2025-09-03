@@ -33,6 +33,9 @@ const signupSchema = yup.object().shape({
   email: yup.string()
     .required('Email is required')
     .email('Invalid email address'),
+    address: yup.string()
+    .required('Address is required')
+    .min(5, 'Address must be at least 5 characters'),
   password: yup.string()
     .required('Password is required')
     .min(8, 'Password must be at least 8 characters')
@@ -47,6 +50,7 @@ type FormData = {
   name: string;
   phone: string;
   email: string;
+  address: string;
   password: string;
   confirmPassword: string;
 };
@@ -60,6 +64,7 @@ const Signup = () => {
       name: '',
       phone: '',
       email: '',
+      address: '',
       password: '',
       confirmPassword: ''
     }
@@ -247,6 +252,37 @@ const Signup = () => {
                   />
                   {errors.email && (
                     <Text style={styles.errorText}>{errors.email.message}</Text>
+                  )}
+                </View>
+
+                {/* Address Field */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>
+                    <MaterialIcons name="map" size={16} color="#FF7622" /> Location
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="address"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <View style={styles.inputWrapper}>
+                        <TextInput
+                          placeholder="Comissariat, Odza"
+                          placeholderTextColor="#999"
+                          style={[
+                            styles.input,
+                            errors.address && styles.inputError
+                          ]}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          value={value}
+                          onChangeText={onChange}
+                          onBlur={onBlur}
+                        />
+                      </View>
+                    )}
+                  />
+                  {errors.address && (
+                    <Text style={styles.errorText}>{errors.address.message}</Text>
                   )}
                 </View>
 

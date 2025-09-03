@@ -9,7 +9,7 @@ export default function PartnerLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabbar,{
+        tabBarStyle: [{
           backgroundColor: '#0A1F33',
           borderTopWidth: 0,
           height: Platform.OS === 'ios' ? 90 : 70,
@@ -35,9 +35,9 @@ export default function PartnerLayout() {
         }}
       />
       <Tabs.Screen
-        name="orders"
+        name="menu"
         options={{
-          title: 'Orders',
+          title: 'Menu',
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="restaurant-menu" size={24} color={color} />
           ),

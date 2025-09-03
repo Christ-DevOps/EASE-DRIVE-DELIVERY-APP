@@ -1,14 +1,32 @@
 const { required, boolean, date } = require('joi');
 const mongoose = require('mongoose');
 
-const DeliberyModel = mongoose.Schema({
-    OrderRef:{
-
+const DeliverySchema = mongoose.Schema({
+    Order:{
+        type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true
     },
-    DeliveryAgentRef:{
-
+    DeliveryAgent:{
+        type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryAgent', required: true
     },
-    pickupTime:{
+    Partner:{
+        type: mongoose.Schema.Types.ObjectId, ref: 'Partner', required: true
+    },
+    deliveryLocation: {
+        type: {
+          type: String,
+          enum: ['Point'],
+          required: true
+        },
+        coordinates: {
+          type: [Number],
+          required: true
+        }
+    },
+    pickedupAt: {
+        type: date,
+        required: false
+    },
+    deliveredAt: {
         type: date,
         required: false
     },
@@ -19,4 +37,15 @@ const DeliberyModel = mongoose.Schema({
     DeliveryAddress: {
         type: String,   
     }
-})
+});
+
+// Indexes for geospatial queries
+DeliverySchema.index({ deliveryLocation: '2dsphere' });
+DeliverySchema.index({ User: 1 });
+DeliverySchema.index({ Order: 1 });
+DeliverySchema.index({ DeliveryAgent: 1 });
+DeliverySchema.index({ Partner: 1 });
+DeliverySchema.index({ status: 1 });
+
+
+exports = mongoose.model("Delivery", DeliverySchema);

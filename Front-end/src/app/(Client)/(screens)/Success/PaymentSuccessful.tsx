@@ -19,7 +19,7 @@ interface OrderDetails {
   orderId: string;
   estimatedDelivery: string;
   address: string;
-  totalAmount: string;
+  totalAmount: FlatArray<number, any>;
   restaurantName: string;
   rating: number;
   cuisineType: string;
@@ -34,7 +34,7 @@ export default function PaymentSuccessPage({
     orderId: '#ORD-2024-0816',
     estimatedDelivery: '25-30 minutes',
     address: '123 Main Street, Apt 4B',
-    totalAmount: '$24.50',
+    totalAmount: 5500,
     restaurantName: "Mario's Italian Kitchen",
     rating: 4.8,
     cuisineType: 'Italian Cuisine'
@@ -101,11 +101,11 @@ export default function PaymentSuccessPage({
   }, []);
 
   const handleTrackOrder = () => {
-    router.push('/(main)/location/LocatioAccess');
+    router.push('/(Client)/(screens)/Orders/ConfirmDelivery');
   };
 
   const handleBackHome = () => {
-    router.push('/(tabs)');
+    router.push('/(Client)/(tabs)');
   };
 
   return (
@@ -178,7 +178,7 @@ export default function PaymentSuccessPage({
 
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Total Paid</Text>
-          <Text style={styles.totalAmount}>{orderDetails.totalAmount}</Text>
+          <Text style={styles.totalAmount}>{orderDetails.totalAmount} frs</Text>
         </View>
       </Animated.View>
 
