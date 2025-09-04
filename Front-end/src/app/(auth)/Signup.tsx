@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import env from 'dotenv';
 import {
   Alert,
   Dimensions,
@@ -55,6 +56,8 @@ type FormData = {
   confirmPassword: string;
 };
 
+const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.100.54:5000/api';
+
 const Signup = () => {
   const router = useRouter();
 
@@ -66,7 +69,8 @@ const Signup = () => {
       email: '',
       address: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+
     }
   });
 
@@ -86,16 +90,30 @@ const Signup = () => {
   const onSubmit = async (data: FormData) => {
     try {
       // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...data, userType }),
+      });
+
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to create account');
+      }
+
       console.log('Form submitted:', { ...data, userType });
-      
+      //Account created successfully
       Alert.alert(
         'Account Created',
         'Your account has been successfully created!',
         [{ text: 'OK', onPress: () => router.replace('/(auth)/LoginScreen') }]
       );
+      //store Token
+      
     } catch (error) {
+      console.error('Signup error:', error);
       Alert.alert(
         'Error',
         'Failed to create account. Please try again.',

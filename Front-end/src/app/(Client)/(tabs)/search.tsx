@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 40,
-    paddingHorizontal: 15,
+    paddingHorizontal: 17,
     backgroundColor: '#fff',
   },
   header: {
@@ -218,7 +218,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   searchInput: {
-    flex: 1,
+    // flex: 1,
+    width: '50%',
     fontSize: 16,
     color: '#333',
   },

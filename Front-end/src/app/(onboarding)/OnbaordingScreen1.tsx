@@ -59,7 +59,7 @@ export default function OnboardingScreen1() {
         >
           <View style={styles.imageContainer}>
             <Image 
-              source={require('../../assets/images/login-graphic.png')} 
+              source={require('../../assets/images/onboarding1.png')} 
               style={styles.image}
             />
           </View>

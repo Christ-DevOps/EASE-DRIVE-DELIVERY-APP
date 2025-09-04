@@ -1,31 +1,31 @@
-import React, { useState } from 'react'
-import { 
-  Button, 
+// Login.tsx
+import React, { useState } from 'react';
+import {
+  Button,
   Image,
-  Platform, 
-  KeyboardAvoidingView, 
-  Pressable, 
-  SafeAreaView, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
+  Platform,
+  KeyboardAvoidingView,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
   View,
   Alert,
   ActivityIndicator,
   ScrollView,
-} from 'react-native'
-import { Ionicons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient'; // ADD THIS IMPORT
+} from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { Link, useRouter } from 'expo-router';
-import { usePredefinedAlerts } from '../../hooks/AlertHook'; // Ensure this import is correct
 import { Controller, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import  CheckBox  from '@/src/components/CheckBox'; // Ensure this import is correct
+import CheckBox from '@/src/components/CheckBox';
 import * as yup from 'yup';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-//
 const SUCCESS_IMAGE = 'https://cdn-icons-png.flaticon.com/512/190/190411.png';
 
 const LoginSchema = yup.object().shape({
@@ -37,28 +37,35 @@ const LoginSchema = yup.object().shape({
     .min(8, 'Password must be at least 8 characters')
     .matches(/[A-Z]/, 'Must contain at least one uppercase letter')
     .matches(/[0-9]/, 'Must contain at least one number'),
-})
+});
 
 type FormData = {
   email: string,
   password: string,
-}
+};
+
+// ---- CONFIG: set this before testing ----
+// If you're developing locally with Expo:
+// - Android emulator (default Android emulator): use "http://10.0.2.2:5000"
+// - iOS simulator: "http://localhost:5000"
+// - Physical device: use your computer LAN IP e.g. "http://192.168.1.50:5000"
+// If deployed, set the HTTPS URL: "https://api.yourdomain.com"
+const API_BASE_URL = __DEV__ ? 'http://192.168.100.54:5000' : 'https://your-production-api.com';
+// Replace the path below if your backend login route differs
+const LOGIN_ENDPOINT = `${API_BASE_URL}/api/auth/login`; // <-- adjust if needed
 
 const Login = () => {
   const router = useRouter();
-  const { loginSuccess } = usePredefinedAlerts();
   const [loaded] = useFonts({
     SpaceMono: require('../../assets/fonts/Quicksand-Bold.ttf'),
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false); // local loading for API call
 
-  {/* Toggle Visibility of Both Password fields and Confirm Password */}
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  const togglePasswordVisibility = () => setShowPassword(v => !v);
 
-  const { control, handleSubmit, formState: {errors, isSubmitting} } = useForm<FormData>({
+  const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: yupResolver(LoginSchema),
     defaultValues: {
       email: '',
@@ -66,23 +73,86 @@ const Login = () => {
     }
   });
 
-  // Handle form submission
+  // Helper: show friendly alert
+  const showAlert = (title: string, message: string) => {
+    Alert.alert(title, message, [{ text: 'OK' }]);
+  };
+
+  // Submit handler that calls backend
   const onSubmit = async (data: FormData) => {
+    setLoading(true);
+
+    // Abort controller to implement timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s
+
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // In a real app, this would be an API call to your backend
-      console.log('Form submitted:', { ...data });
-      
-      // Show success alert
-      loginSuccess(SUCCESS_IMAGE);
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        'Login failed. Please check your credentials.',
-        [{ text: 'OK' }]
-      );
+      const res = await fetch(LOGIN_ENDPOINT, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password
+        })
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        // try to parse body for message
+        let errBody = null;
+        try { errBody = await res.json(); } catch (e) { /* ignore */ }
+
+        if (res.status === 401 || res.status === 400) {
+          const msg = errBody?.message || 'Invalid credentials';
+          showAlert('Login failed', msg);
+        } else {
+          const msg = errBody?.message || 'Unexpected server error';
+          showAlert('Server error', msg);
+        }
+        setLoading(false);
+        return;
+      }
+
+      const body = await res.json();
+      // Expecting { token, user, ... } from your backend
+      const token = body.token || body.accessToken;
+      const user = body.user || null;
+
+      if (!token) {
+        showAlert('Login error', 'No token returned from server.');
+        setLoading(false);
+        return;
+      }
+
+      // Persist token & user
+      await AsyncStorage.setItem('token', token);
+      if (user) {
+        await AsyncStorage.setItem('user', JSON.stringify(user));
+      }
+
+      // Navigate to main app (adjust route to your app)
+      router.replace('/(Client)/(tabs)');
+
+    } catch (err: any) {
+      // Distinguish common errors
+      if (err.name === 'AbortError') {
+        showAlert('Timeout', 'Request timed out. Try again or check your network.');
+      } else if (err.message && err.message.includes('Network request failed')) {
+        // Very common in Expo -> wrong host/IP
+        showAlert(
+          'Network Error',
+          `Cannot reach the server. If you're running the backend locally, ensure API_BASE_URL is your computer's LAN IP and that the backend is running. On Android emulator use 10.0.2.2.`
+        );
+      } else {
+        showAlert('Error', err.message || 'An unknown error occurred.');
+      }
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
     }
   };
 
@@ -95,8 +165,6 @@ const Login = () => {
         style={styles.container}
       >
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          
-          {/* NEW GRADIENT HEADER */}
           <View style={styles.gradientHeader}>
             <LinearGradient
               colors={['#FF7622', '#FF9A56', '#FFB366']}
@@ -104,31 +172,26 @@ const Login = () => {
               end={{ x: 1, y: 1 }}
               style={styles.gradientBackground}
             >
-              {/* Decorative elements - login themed */}
               <View style={styles.decorativeContainer}>
                 <Ionicons name="shield-checkmark" size={40} color="rgba(255,255,255,0.3)" style={styles.icon1} />
                 <Ionicons name="person-circle" size={45} color="rgba(255,255,255,0.2)" style={styles.icon2} />
                 <Ionicons name="lock-closed" size={35} color="rgba(255,255,255,0.25)" style={styles.icon3} />
                 <Ionicons name="phone-portrait" size={30} color="rgba(255,255,255,0.2)" style={styles.icon4} />
               </View>
-              
-              {/* Back button and title */}
+
               <View style={styles.headerContent}>
                 <Pressable style={styles.backButtonGradient} onPress={() => router.push('/(onboarding)/OnboardingScreen2')}>
-                  <Ionicons name="arrow-back" size={24} color="white"  />
+                  <Ionicons name="arrow-back" size={24} color="white" />
                 </Pressable>
                 <View style={styles.titleContainer}>
-                  <Text style={styles.mainTitle}>Welcome Back!</Text>
+                  <Text style={styles.mainTitle}>Welcome Back!</Text>   
                   <Text style={styles.subtitle}>Please login to continue</Text>
                 </View>
               </View>
-
             </LinearGradient>
           </View>
 
-          {/* Form Section */}
           <View style={styles.form}>
-            {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <Controller
@@ -158,7 +221,6 @@ const Login = () => {
               )}
             </View>
 
-            {/* Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <Controller
@@ -179,14 +241,14 @@ const Login = () => {
                       onChangeText={onChange}
                       onBlur={onBlur}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.eyeIcon}
                       onPress={togglePasswordVisibility}
                     >
-                      <MaterialIcons 
-                        name={showPassword ? "visibility-off" : "visibility"} 
-                        size={24} 
-                        color="#888" 
+                      <MaterialIcons
+                        name={showPassword ? "visibility-off" : "visibility"}
+                        size={24}
+                        color="#888"
                       />
                     </TouchableOpacity>
                   </View>
@@ -194,10 +256,9 @@ const Login = () => {
               />
               {errors.password && (
                 <Text style={styles.errorText}>{errors.password.message}</Text>
-              )}  
+              )}
             </View>
 
-            {/* Remember Me & Forgot Password */}
             <View style={styles.forgotPassword}>
               <View style={styles.checkboxContainer}>
                 <CheckBox label='Remember Me' />
@@ -207,20 +268,18 @@ const Login = () => {
               </Pressable>
             </View>
 
-            {/* Submit Button */}
-            <TouchableOpacity 
-              style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]}
+            <TouchableOpacity
+              style={[styles.submitButton, (isSubmitting || loading) && { opacity: 0.7 }]}
               onPress={handleSubmit(onSubmit)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || loading}
             >
-              {isSubmitting ? (
+              {(isSubmitting || loading) ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
                 <Text style={styles.submitText}>Log In</Text>
               )}
             </TouchableOpacity>
 
-            {/* Signup Prompt */}
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account?</Text>
               <Link href="/(auth)/Signup" asChild>
@@ -230,41 +289,35 @@ const Login = () => {
               </Link>
             </View>
 
-            {/* Divider */}
             <View style={styles.dividerContainer}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>Or continue with</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Social Media Login */}
             <View style={styles.socialMedia}>
               <TouchableOpacity style={styles.socialContainer}>
-                <Image 
-                  source={require('../../assets/images/google.png')} 
-                  style={styles.socialIcons} 
-                  alt='Google login' 
+                <Image
+                  source={require('../../assets/images/google.png')}
+                  style={styles.socialIcons}
                 />
               </TouchableOpacity>
               <TouchableOpacity style={styles.socialContainer}>
-                <Image 
-                  source={require('../../assets/images/apple.png')} 
-                  style={styles.socialIcons} 
-                  alt='Apple login' 
+                <Image
+                  source={require('../../assets/images/apple.png')}
+                  style={styles.socialIcons}
                 />
               </TouchableOpacity>
               <TouchableOpacity style={styles.socialContainer}>
-                <Image 
-                  source={require('../../assets/images/twitter.png')} 
-                  style={styles.socialIcons} 
-                  alt='Twitter login' 
+                <Image
+                  source={require('../../assets/images/twitter.png')}
+                  style={styles.socialIcons}
                 />
               </TouchableOpacity>
             </View>
 
-            {/* Quick Navigation - Remove this in production */}
-            <TouchableOpacity 
-              onPress={() => router.replace('/(Client)/(tabs)')} 
+            <TouchableOpacity
+              onPress={() => router.replace('/(Client)/(tabs)')}
               style={styles.quickNavButton}
             >
               <Text style={styles.quickNavText}>Quick Access to Home</Text>
@@ -273,25 +326,25 @@ const Login = () => {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;
 
+// NOTE: your styles unchanged; copy them from your original file below:
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: '100%',
     backgroundColor: "#0A1F33",
   },
-
-  // NEW GRADIENT HEADER STYLES
   gradientHeader: {
     height: 320,
     position: 'relative',
   },
   gradientBackground: {
     flex: 1,
-    paddingTop: 50, // Account for status bar
+    paddingTop: 50,
   },
   decorativeContainer: {
     position: 'absolute',
@@ -355,32 +408,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: 'SpaceMono',
   },
-  illustrationContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 30,
-  },
-  welcomeCard: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    padding: 24,
-    borderRadius: 20,
-    alignItems: 'center',
-    backdropFilter: 'blur(10px)',
-  },
-  welcomeText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
-    fontFamily: 'SpaceMono',
-  },
-
-  // REMOVE THESE OLD STYLES:
-  // header: { ... },
-  // backButton: { ... },
-  // title: { ... },
-
   form: {
     flex: 6,
     backgroundColor: 'white',
@@ -389,7 +416,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingTop: 40,
     paddingBottom: 30,
-    marginTop: -20, // Creates overlap with gradient
+    marginTop: -20,
   },
   inputGroup: {
     marginBottom: 20,
@@ -487,8 +514,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontFamily: 'SpaceMono',
   },
-
-  // ENHANCED DIVIDER
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -505,8 +530,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'SpaceMono',
   },
-
-  // ENHANCED SOCIAL MEDIA SECTION
   socialMedia: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -529,8 +552,6 @@ const styles = StyleSheet.create({
     height: 32,
     width: 32,
   },
-
-  // QUICK NAV BUTTON (Remove in production)
   quickNavButton: {
     marginTop: 20,
     padding: 12,

@@ -1,3 +1,4 @@
+// HomeScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,7 +11,10 @@ import {
   SafeAreaView,
   FlatList,
   Dimensions,
-  ActivityIndicator
+  ActivityIndicator,
+  BackHandler,
+  Alert,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -25,7 +29,7 @@ import CategoryCard from '@/src/components/client/CategoryCard';
 import RestaurantCard from '@/src/components/client/RestaurantCard';
 import MealCard from '@/src/components/client/Meal';
 import MenuItemPopup from '@/src/components/MealPopup';
-import { push } from 'expo-router/build/global-state/routing';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -50,11 +54,31 @@ export default function HomeScreen() {
   });
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterOptions | null>(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<any>(null);
 
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
-   // Fetch data from database/API
+
+  // ---- prevent hardware back (Android) while on this screen ----
+  useFocusEffect(
+    React.useCallback(() => {
+      if (Platform.OS !== 'android') return;
+
+      const onBackPress = () => {
+        // Confirm exit so user cannot go back to auth screens
+        Alert.alert('Exit App', 'Do you want to exit the app?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Exit', style: 'destructive', onPress: () => BackHandler.exitApp() },
+        ]);
+        return true; // prevent default behavior (going back)
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [])
+  );
+
+  // Fetch data from database/API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -73,18 +97,18 @@ export default function HomeScreen() {
         setPopularMeals(mealsData);
         setLoading(prev => ({ ...prev, meals: false }));
       } catch (err) {
-        // setError('Failed to load data. Please try again');
         console.error('Database error:', err);
-        throw new Error;
+        setError('Failed to load data. Please try again');
+        setLoading({ categories: false, restaurants: false, meals: false });
       }
     };
 
     fetchData();
   }, []);
 
-    const { dispatch } = useCart();
+  const { dispatch } = useCart();
 
-    {/* Add Tocart Function Available All over the page Thanks to CartProvider */}
+  {/* Add Tocart Function Available All over the page Thanks to CartProvider */}
   const handleAddToCart = (item: any) => {
     dispatch({
       type: 'ADD_ITEM',
@@ -98,7 +122,6 @@ export default function HomeScreen() {
       }
     });
   }
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -234,18 +257,18 @@ export default function HomeScreen() {
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={() => setError(null)}>
+            <TouchableOpacity style={styles.retryButton} onPress={() => { setError(null); /* optionally re-fetch */ }}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
       <MenuItemPopup
-      visible={popupVisible}
-      item={selectedMeal}
-      onClose={() => setPopupVisible(false)}
-      addToCart={handleAddToCart}
-    />
+        visible={popupVisible}
+        item={selectedMeal}
+        onClose={() => setPopupVisible(false)}
+        addToCart={handleAddToCart}
+      />
     </SafeAreaView>
   );
 }
@@ -373,164 +396,15 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingBottom: 10,
   },
-  // categoryCard: {
-  //   width: 100,
-  //   backgroundColor: '#FFF8F2',
-  //   borderRadius: 20,
-  //   padding: 15,
-  //   marginRight: 15,
-  //   alignItems: 'center',
-  //   justifyContent: 'center',
-  //   elevation: 2,
-  //   shadowColor: '#000',
-  //   shadowOpacity: 0.1,
-  //   shadowRadius: 4,
-  //   shadowOffset: { width: 0, height: 2 },
-  // },
-  // categoryIconContainer: {
-  //   width: 40,
-  //   height: 40,
-  //   borderRadius: 20,
-  //   backgroundColor: '#FFF',
-  //   alignItems: 'center',
-  //   justifyContent: 'center',
-  //   marginBottom: 10,
-  // },
-  // categoryTitle: {
-  //   fontWeight: '600',
-  //   fontSize: 14,
-  //   color: '#333',
-  //   textAlign: 'center',
-  // },
    restaurantsContainer: {
      paddingLeft: 20,
    marginTop: 0,
      paddingBottom: 20,
    },
-  // restaurantCard: {
-  //   width: width * 0.75,
-  //   backgroundColor: '#FFF',
-  //   borderRadius: 20,
-  //   overflow: 'hidden',
-  //   marginRight: 20,
-  //   elevation: 3,
-  //   shadowColor: '#000',
-  //   shadowOffset: { width: 0, height: 2 },
-  //   shadowOpacity: 0.1,
-  //   shadowRadius: 4,
-  // },
-  // restaurantImage: {
-  //   width: '100%',
-  //   height: 150,
-  // },
-  // restaurantInfo: {
-  //   padding: 15,
-  // },
-  // restaurantName: {
-  //   fontWeight: '700',
-  //   fontSize: 18,
-  //   color: '#333',
-  //   marginBottom: 5,
-  // },
-  // restaurantLocation: {
-  //   fontSize: 14,
-  //   color: '#666',
-  //   marginBottom: 8,
-  // },
-  // restaurantTags: {
-  //   fontSize: 14,
-  //   color: '#888',
-  //   marginBottom: 12,
-  // },
-  // restaurantDetails: {
-  //   flexDirection: 'row',
-  //   justifyContent: 'space-between',
-  //   alignItems: 'center',
-  // },
-  // ratingContainer: {
-  //   flexDirection: 'row',
-  //   alignItems: 'center',
-  //   backgroundColor: '#FFF8F2',
-  //   paddingVertical: 4,
-  //   paddingHorizontal: 8,
-  //   borderRadius: 10,
-  // },
-  // ratingText: {
-  //   fontSize: 14,
-  //   fontWeight: '600',
-  //   color: '#333',
-  //   marginLeft: 4,
-  // },
-  // deliveryFee: {
-  //   fontSize: 14,
-  //   color: '#666',
-  //   paddingHorizontal: 8,
-  //   backgroundColor: '#F5F5F5',
-  //   borderRadius: 8,
-  // },
-  // deliveryTime: {
-  //   fontSize: 14,
-  //   fontWeight: '500',
-  //   paddingHorizontal: 8,
-  //   backgroundColor: '#FFF8F2',
-  //   borderRadius: 8,
-  //   color: '#FF7622',
-  // },
-   mealsContainer: {
+    mealsContainer: {
      paddingHorizontal: 20,
      paddingBottom: 30,
    },
-  // mealCard: {
-  //   backgroundColor: '#FFF',
-  //   borderRadius: 15,
-  //   marginBottom: 15,
-  //   flexDirection: 'row',
-  //   overflow: 'hidden',
-  //   elevation: 2,
-  //   shadowColor: '#000',
-  //   shadowOpacity: 0.1,
-  //   shadowRadius: 4,
-  //   shadowOffset: { width: 0, height: 2 },
-  // },
-  // mealImage: {
-  //   width: 100,
-  //   height: 100,
-  //   resizeMode: 'cover',
-  // },
-  // mealInfo: {
-  //   flex: 1,
-  //   padding: 15,
-  //   justifyContent: 'center',
-  // },
-  // mealName: {
-  //   fontWeight: '700',
-  //   fontSize: 16,
-  //   color: '#333',
-  //   marginBottom: 5,
-  // },
-  // mealRestaurant: {
-  //   fontSize: 14,
-  //   color: '#666',
-  //   marginBottom: 10,
-  // },
-  // mealDetails: {
-  //   flexDirection: 'row',
-  //   justifyContent: 'space-between',
-  //   alignItems: 'center',
-  // },
-  // mealPrice: {
-  //   fontSize: 16,
-  //   fontWeight: '700',
-  //   color: '#FF7622',
-  // },
-  // mealRating: {
-  //   flexDirection: 'row',
-  //   alignItems: 'center',
-  //   backgroundColor: '#FFF8F2',
-  //   paddingVertical: 4,
-  //   paddingHorizontal: 8,
-  //   borderRadius: 10,
-  // },
     loadingIndicator: {
     paddingVertical: 30,
   },

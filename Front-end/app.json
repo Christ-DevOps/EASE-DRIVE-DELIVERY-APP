@@ -10,12 +10,18 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-       "infoPlist": {
-    "NSPhotoLibraryUsageDescription": "We need access to photos to upload business images.",
-    "NSCameraUsageDescription": "We may need access to the camera to take business photos."
-  }
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "We need access to photos to upload business images.",
+        "NSCameraUsageDescription": "We may need access to the camera to take business photos."
+      }
     },
     "android": {
+      "permissions": [
+        "INTERNET",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -37,7 +43,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

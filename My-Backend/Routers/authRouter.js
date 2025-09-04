@@ -16,6 +16,15 @@ router.post('/login', authCtrl.login);
 router.post('/resetPassword', authCtrl.ResetPassword);
 router.post('/verification', authCtrl.VerifyOtp);
 router.post('/SetPassword', authCtrl.SetNewPassword);
+router.post('/restaurants/verify', authCtrl.verifyRestaurant);
+
+//profile
+// router.get('/profile', require('../Middlewares/authMiddleWare').protect, authCtrl.profile);
+// router.put('/profile', require('../Middlewares/authMiddleWare').proteft, authCtrl.updateProfile);
+
+//approve partner and delivery agent
+router.patch('/partner/:id/approve', require('../Middlewares/authMiddleWare').protect, require('../Middlewares/roleMiddleWare')('admin'), authCtrl.approvePartner);
+router.patch('/delivery/:id/approve', require('../Middlewares/authMiddleWare').protect, require('../Middlewares/roleMiddleWare')('admin'), authCtrl.approveDeliveryAgent);
 
 // router.get('/profile', require('../Middlewares/authMiddleWare'), authCtrl.profile);
 

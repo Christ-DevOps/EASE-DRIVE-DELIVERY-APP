@@ -193,7 +193,7 @@ const PartnerSignup = () => {
       await new Promise((res) => setTimeout(res, 900));
 
       Alert.alert('Success', 'Partner registration submitted. We will review and contact you.');
-      router.replace('/(partners)/(tabs)/home');
+      router.replace('/(partners)/auth/partnerWaitingScreen');
     } catch (err: any) {
       console.error('submit error', err);
       Alert.alert('Error', err.message ?? 'Could not submit registration.');
