@@ -1,15 +1,15 @@
 import { Platform } from "react-native";
 
-let API_BASE_URL = "http://localhost:5000"; // fallback (development)
+let API_BASE_URL = "http://192.168.100.54:5000"; // fallback (development)
 
 if (__DEV__) {
   if (Platform.OS === "android") {
-    API_BASE_URL = "http://10.0.2.2:5000"; // Android emulator
+    API_BASE_URL = "http://192.168.100.54:5000"; // Android emulator
   } else if (Platform.OS === "ios") {
     API_BASE_URL = "http://localhost:5000"; // iOS simulator
   } else {
     // Physical device → replace with your machine’s IPv4 address
-    API_BASE_URL = "http://10.171.8.152:5000";
+    API_BASE_URL = "http://192.168.100.54:5000";
   }
 } else {
   // Production

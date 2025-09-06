@@ -63,7 +63,7 @@ const Partnerschema = mongoose.Schema({
 });
 
 // Indexes for geospatial and text search
-Partnerschema.index({ location: '2dsphere' });
+Partnerschema.index({ restaurantLocation: '2dsphere' });
 Partnerschema.index({ restaurantName: 'text', description: 'text' });
 Partnerschema.index({ user: 1 });
 

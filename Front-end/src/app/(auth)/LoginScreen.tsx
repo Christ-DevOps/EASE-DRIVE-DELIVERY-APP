@@ -50,7 +50,7 @@ type FormData = {
 // - iOS simulator: "http://localhost:5000"
 // - Physical device: use your computer LAN IP e.g. "http://192.168.1.50:5000"
 // If deployed, set the HTTPS URL: "https://api.yourdomain.com"
-const API_BASE_URL = __DEV__ ? 'http://10.171.8.152:5000' : 'https://your-production-api.com';
+const API_BASE_URL = __DEV__ ? 'http://192.168.100.54:5000' : 'https://your-production-api.com';
 // Replace the path below if your backend login route differs
 const LOGIN_ENDPOINT = `${API_BASE_URL}/api/auth/login`; // <-- adjust if needed
 
@@ -186,6 +186,7 @@ const Login = () => {
                 <View style={styles.titleContainer}>
                   <Text style={styles.mainTitle}>Welcome Back!</Text>   
                   <Text style={styles.subtitle}>Please login to continue</Text>
+                  <TouchableOpacity onPress={()=> router.replace('/(admin)/(tabs)/Dashboard')} ><Text>Admin</Text></TouchableOpacity>
                 </View>
               </View>
             </LinearGradient>

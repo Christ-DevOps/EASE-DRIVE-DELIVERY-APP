@@ -4,7 +4,7 @@ import WaitingScreen from '@/src/components/WaitingScreen'
 
 const partnerWaitingScreen = () => {
   return (
-    <View>
+    <View style={styles.container} >
       <WaitingScreen userType="partner" />
     </View>
   )
@@ -12,4 +12,8 @@ const partnerWaitingScreen = () => {
 
 export default partnerWaitingScreen
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  container: {
+    flex: 1
+  }
+})

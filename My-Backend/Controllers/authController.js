@@ -58,6 +58,8 @@ exports.register = async (req, res) => {
     const files = req.files || {};
     const role = (body.role || 'client').toLowerCase();
 
+    console.log(body)
+
     // Basic required fields (common)
     if (!body.name || !body.email || !body.phone || !body.password || !body.address) {
       return res.status(400).json({ message: 'all fields are required' });
@@ -128,7 +130,7 @@ exports.register = async (req, res) => {
         restaurantName: body.restaurantName || body.restaurant || userData.name,
         description: body.description || '',
         address: body.restaurantLocation || body.address,
-        categories: body.foodcategory ? body.foodcategory.split(',').map(s => s.trim()).filter(Boolean) : [],
+        category: body.foodcategory ? body.foodcategory.split(',').map(s => s.trim()).filter(Boolean) : [],
         BankAccount: body.BankAccount,
         approved: false
       };
@@ -141,6 +143,9 @@ exports.register = async (req, res) => {
           return p;
         });
       }
+
+      console.log("partner data", partnerData);
+      
 
       partner = await Partner.create(partnerData);
     }

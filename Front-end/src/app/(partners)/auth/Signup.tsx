@@ -24,9 +24,11 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { API } from '@/src/config/apiConfig'
-
 import UploadField from '@/src/components/UploadFields';
 import { useUpload } from '@/src/context/UploadContext';
+
+const API_BASE_URL = process.env.BASE_URL || 'http://192.168.100.54:5000/api';
+
 
 /* ---------------- validation schema ---------------- */
 const PartnerSchema = yup.object().shape({
@@ -72,7 +74,6 @@ type BusinessHours = {
   };
 };
 
-const REGISTER_ENDPOINT = API.AUTH.REGISTER;
 
 /* ---------------- constants ---------------- */
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
@@ -176,6 +177,7 @@ const PartnerSignup = () => {
   };
 
 const onSubmit = async (data: PartnerFormData) => {
+  if(!validateFiles()) return;
   try {
     // Validate files first
     if (!businessDoc) {
@@ -209,10 +211,31 @@ const onSubmit = async (data: PartnerFormData) => {
   }
 };
 
-// Fixed submission function
+//checks if the files uploaded correctly
+const validateFiles = () => {
+  if (!businessDoc) {
+    Alert.alert('Missing document', 'Please upload your business license/document.');
+    return false;
+  }
+  if (businessPhotos.length === 0) {
+    Alert.alert('Missing photos', 'Please upload at least one business photo.');
+    return false;
+  }
+  return true;
+};
+
+// Fix the submitPartnerToServer function in your React Native component
+
 async function submitPartnerToServer(formValues: PartnerFormData) {
   try {
-    // Build FormData with correct backend field names
+    const test = await fetch('https://www.google.com', { method: 'HEAD' });
+    console.log('Internet test ok', test.status);
+  } catch (e) {
+    console.warn('No network connectivity (device).', e);
+  }
+
+  try {
+    // Build FormData with CORRECT backend field names
     const fd = new FormData();
     fd.append('role', 'partner');
     fd.append('name', formValues.business_name);
@@ -220,14 +243,18 @@ async function submitPartnerToServer(formValues: PartnerFormData) {
     fd.append('phone', formValues.phone);
     fd.append('password', formValues.password);
     fd.append('address', formValues.address);
-    // IMPORTANT: Backend expects 'restaurantLocation', not just 'address'
+    
+    // FIXED: Backend expects 'restaurantLocation' for partner-specific address
     fd.append('restaurantLocation', formValues.address);
+    
+    // FIXED: Backend expects 'BankAccount' (capital B)
     fd.append('BankAccount', formValues.account_number);
     fd.append('description', formValues.description);
-    // Backend expects 'foodcategory', not 'categories'
+    
+    // FIXED: Backend expects 'foodcategory', not 'categories'
     fd.append('foodcategory', formValues.categories);
-
-    // Append business hours if needed
+    
+    // OPTIONAL: Add business hours if you want to extend the backend
     fd.append('businessHours', JSON.stringify(businessHours));
 
     // Append files as 'partnerDocs'
@@ -241,11 +268,13 @@ async function submitPartnerToServer(formValues: PartnerFormData) {
       fd.append('partnerDocs', {
         uri: photo.uri,
         name: photo.name || `photo_${index}.jpg`,
-        type: photo.type || 'image/jpeg/pdf'
+        type: photo.type || 'image/jpeg'
       } as any);
     });
 
-    const response = await fetch(REGISTER_ENDPOINT, {
+    console.log("Uploading files to server...");
+
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       body: fd,
       
@@ -253,17 +282,29 @@ async function submitPartnerToServer(formValues: PartnerFormData) {
 
     if (!response.ok) {
       let errorBody = null;
+      console.log("An error occurred at response level, status:", response.status);
       try { 
         errorBody = await response.json(); 
       } catch (_) { 
         // If JSON parsing fails, use status text
+        errorBody = { message: `Server error: ${response.statusText}` };
       }
       throw new Error(errorBody?.message || `Server returned ${response.status}`);
     }
 
     const result = await response.json();
-    Alert.alert('Success', 'Partner registration submitted successfully. We will review and contact you.');
-    router.replace('/(partners)/auth/partnerWaitingScreen');
+    console.log('Registration successful:', result);
+    
+    Alert.alert(
+      'Success', 
+      'Partner registration submitted successfully. We will review and contact you.',
+      [
+        {
+          text: 'OK',
+          onPress: () => router.replace('/(partners)/auth/partnerWaitingScreen')
+        }
+      ]
+    );
 
   } catch (err: any) {
     console.error('submitPartnerToServer error:', err);
@@ -314,8 +355,9 @@ async function submitPartnerToServer(formValues: PartnerFormData) {
                 <View style={styles.titleContainer}>
                   <Text style={styles.mainTitle}>Partner Registration</Text>
                   <Text style={styles.subtitle}>Join our delivery network</Text>
+                  <TouchableOpacity onPress={()=> router.replace('/(partners)/(tabs)/home')} ><Text>home</Text></TouchableOpacity>
                 </View>
-                {/* <TouchableOpacity onPress={()=> router.push('/(partners)/(tabs)/home')} ><Text>Home</Text></TouchableOpacity> */}
+                {/* <TouchableOpacity onP,90'ress={()=> router.push('/(partners)/(tabs)/home')} ><Text>Home</Text></TouchableOpacity> */}
               </View>
             </LinearGradient>
           </View>

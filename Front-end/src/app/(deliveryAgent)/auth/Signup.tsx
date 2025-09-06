@@ -29,9 +29,9 @@ import * as yup from 'yup';
  * IMPORTANT:
  * - Set API_BASE_URL to your backend
  * - Partner check endpoint used: POST `${API_BASE_URL}/api/partners/check-exists`
- * - Register endpoint used: POST `${API_BASE_URL}/api/auth/register`
+ * - Register endpoint used: POST `${API_BASE_URL}/api/auth/register`b
  */
-const API_BASE_URL = __DEV__ ? 'http://10.171.8.152:5000' : 'https://your-production-api.com';
+const API_BASE_URL =  'http://192.168.100.54:5000';
 const PARTNER_CHECK = `${API_BASE_URL}/api/partners/check-exists`;
 const REGISTER_ENDPOINT = `${API_BASE_URL}/api/auth/register`;
 
@@ -327,6 +327,7 @@ const handleRemoveProfilePhoto = () => setProfilePhoto(null);
                 <View style={styles.titleContainer}>
                   <Text style={styles.mainTitle}>Delivery Agent</Text>
                   <Text style={styles.subtitle}>Start earning with us today</Text>
+                  <TouchableOpacity onPress={()=> router.replace('/(deliveryAgent)/(tabs)/Home')}><Text>home</Text></TouchableOpacity>
                 </View>
               </View>
             </LinearGradient>

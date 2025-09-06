@@ -36,6 +36,8 @@ app.use('/api/partner', partnerRouter)
 // example admin route
 const protect = require('./Middlewares/authMiddleWare');
 const authorize = require('./Middlewares/roleMiddleWare');
+const adminRoutes = require('./Routers/adminRouter');
+
 
 
 // app.get('/api/admin/stats', protect, authorize('admin'), (req, res) => {

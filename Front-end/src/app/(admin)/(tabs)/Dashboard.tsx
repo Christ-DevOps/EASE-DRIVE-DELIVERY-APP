@@ -19,16 +19,16 @@ const AdminDashboard = () => {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
-    totalUsers: 2547,
-    clients: 1890,
-    partners: 156,
-    deliveryAgents: 89,
-    activeAgents: 67,
-    todayOrders: 234,
-    totalOrders: 15678,
-    revenue: 45678.90,
-    pendingRequests: 12,
-    unreadFeedback: 8
+    totalUsers: 15,
+    clients: 4,
+    partners: 3,
+    deliveryAgents: 4,
+    activeAgents: 3,
+    todayOrders: 0,
+    totalOrders: 3,
+    revenue: 10000,
+    pendingRequests: 2,
+    unreadFeedback: 4
   });
 
   const [recentOrders, setRecentOrders] = useState([
@@ -172,13 +172,18 @@ const AdminDashboard = () => {
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Admin Dashboard</Text>
-            <Text style={styles.headerSubtitle}>Delivery Management System</Text>
+            <Text style={styles.headerSubtitle}>EaseDrive Management System </Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
             <Ionicons name="person" size={24} color="white" />
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      <View>
+        <Text>Welcome Back, To You Sir Christ</Text>
+      </View>
+
 
       <ScrollView 
         contentContainerStyle={styles.content}
@@ -252,7 +257,7 @@ const AdminDashboard = () => {
             subtitle={`${stats.unreadFeedback} unread messages`}
             colors={['#F59E0B', '#D97706']}
             badge={stats.unreadFeedback}
-            onPress={() => router.push('/(admin)/feedback')}
+            onPress={() => router.push('/(admin)/(tabs)/Feedback')}
           />
           <QuickActionCard
             icon="add-circle"

@@ -95,7 +95,7 @@ const WaitingScreen = ({ userType }: WaitingScreenParamType) => {
     } else {
       return {
         icon: 'storefront',
-        title: 'Welcome to QuickEats Partnership!',
+        title: 'Welcome to EaseDrive Partnership!',
         subtitle: 'Restaurant Verification in Progress',
         description: 'We\'re excited to have you join our restaurant network. Our partnership team is reviewing your restaurant details and documentation to ensure quality standards.',
         timeframe: '2-3 business days',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 30,
-    marginTop: -60, // Pull up into the gradient
+    marginTop: -10, // Pull up into the gradient
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

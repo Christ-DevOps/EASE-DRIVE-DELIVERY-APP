@@ -9,4 +9,4 @@ router.get('/pending',auth.validatePartner, partnerCtrl.getPendingRequests);
 router.put('/approve/:id', auth.validatePartner, partnerCtrl.approveRequest);
 router.delete('/reject/:id', auth.validatePartner, partnerCtrl.rejectRequest);
 
-module.exports = router;
+module.exports = router;   
