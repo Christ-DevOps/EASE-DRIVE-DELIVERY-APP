@@ -144,7 +144,7 @@ const ProfileScreen = () => {
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton}>
+        <TouchableOpacity style={styles.logoutButton} onPress={()=> router.replace('/(auth)/LoginScreen')} >
           <View style={styles.logoutIcon}>
             <MaterialIcons name="logout" size={24} color="#FF3B30" />
           </View>

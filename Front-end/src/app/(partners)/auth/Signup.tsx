@@ -23,6 +23,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { API } from '@/src/config/apiConfig'
 
 import UploadField from '@/src/components/UploadFields';
 import { useUpload } from '@/src/context/UploadContext';
@@ -40,7 +41,15 @@ const PartnerSchema = yup.object().shape({
     .string()
     .required('Account number is required')
     .min(6, 'Must be at least 6 digits'),
-  location: yup.string().required('Location is required'),
+  address: yup.string().required('Location is required'),
+    password: yup
+    .string()
+    .required('Password is required')
+    .min(6, 'Password must be at least 6 characters'),
+  description: yup
+    .string()
+    .required('Business description is required')
+    .min(20, 'Description must be at least 20 characters'),
 });
 
 /* ---------------- types ---------------- */
@@ -50,7 +59,9 @@ type PartnerFormData = {
   phone: string;
   categories: string;
   account_number: string;
-  location: string;
+  address: string;
+  password: string,
+  description: string
 };
 
 type BusinessHours = {
@@ -60,6 +71,8 @@ type BusinessHours = {
     closeTime: string;
   };
 };
+
+const REGISTER_ENDPOINT = API.AUTH.REGISTER;
 
 /* ---------------- constants ---------------- */
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
@@ -97,7 +110,9 @@ const PartnerSignup = () => {
       phone: '',
       categories: '',
       account_number: '',
-      location: '',
+      address: '',
+      password: '',
+      description: ''
     },
   });
 
@@ -160,47 +175,101 @@ const PartnerSignup = () => {
     return { ok: true, safe: true };
   };
 
-  const onSubmit = async (data: PartnerFormData) => {
-    try {
-      if (!businessDoc) {
-        Alert.alert('Missing document', 'Please upload your business license/document.');
-        return;
-      }
-      if (businessPhotos.length === 0) {
-        Alert.alert('Missing photos', 'Please upload at least one business photo.');
-        return;
-      }
-
-      setUploadingFiles(true);
-      const allFiles = [businessDoc, ...businessPhotos];
-      for (const f of allFiles) {
-        const scan = await scanFileOnServer(f);
-        if (!scan.ok || !scan.safe) {
-          throw new Error('One of the uploaded files failed the security scan.');
-        }
-      }
-
-      if (typeof uploadToServer === 'function') {
-        const docRes = await uploadToServer(businessDoc);
-        if (!docRes.ok) throw new Error(docRes.error || 'Document upload failed');
-
-        for (const p of businessPhotos) {
-          const r = await uploadToServer(p);
-          if (!r.ok) throw new Error(r.error || 'Photo upload failed');
-        }
-      }
-
-      await new Promise((res) => setTimeout(res, 900));
-
-      Alert.alert('Success', 'Partner registration submitted. We will review and contact you.');
-      router.replace('/(partners)/auth/partnerWaitingScreen');
-    } catch (err: any) {
-      console.error('submit error', err);
-      Alert.alert('Error', err.message ?? 'Could not submit registration.');
-    } finally {
-      setUploadingFiles(false);
+const onSubmit = async (data: PartnerFormData) => {
+  try {
+    // Validate files first
+    if (!businessDoc) {
+      Alert.alert('Missing document', 'Please upload your business license/document.');
+      return;
     }
-  };
+    if (businessPhotos.length === 0) {
+      Alert.alert('Missing photos', 'Please upload at least one business photo.');
+      return;
+    }
+
+    setUploadingFiles(true);
+
+    // Scan files for security
+    const allFiles = [businessDoc, ...businessPhotos];
+    for (const f of allFiles) {
+      const scan = await scanFileOnServer(f);
+      if (!scan.ok || !scan.safe) {
+        throw new Error('One of the uploaded files failed the security scan.');
+      }
+    }
+
+    // Now submit to server - call the actual submission function
+    await submitPartnerToServer(data);
+
+  } catch (err: any) {
+    console.error('submit error', err);
+    Alert.alert('Error', err.message ?? 'Could not submit registration.');
+  } finally {
+    setUploadingFiles(false);
+  }
+};
+
+// Fixed submission function
+async function submitPartnerToServer(formValues: PartnerFormData) {
+  try {
+    // Build FormData with correct backend field names
+    const fd = new FormData();
+    fd.append('role', 'partner');
+    fd.append('name', formValues.business_name);
+    fd.append('email', formValues.email);
+    fd.append('phone', formValues.phone);
+    fd.append('password', formValues.password);
+    fd.append('address', formValues.address);
+    // IMPORTANT: Backend expects 'restaurantLocation', not just 'address'
+    fd.append('restaurantLocation', formValues.address);
+    fd.append('BankAccount', formValues.account_number);
+    fd.append('description', formValues.description);
+    // Backend expects 'foodcategory', not 'categories'
+    fd.append('foodcategory', formValues.categories);
+
+    // Append business hours if needed
+    fd.append('businessHours', JSON.stringify(businessHours));
+
+    // Append files as 'partnerDocs'
+    fd.append('partnerDocs', {
+      uri: businessDoc.uri,
+      name: businessDoc.name || 'business_doc.pdf',
+      type: businessDoc.type || 'application/pdf'
+    } as any);
+
+    businessPhotos.forEach((photo, index) => {
+      fd.append('partnerDocs', {
+        uri: photo.uri,
+        name: photo.name || `photo_${index}.jpg`,
+        type: photo.type || 'image/jpeg/pdf'
+      } as any);
+    });
+
+    const response = await fetch(REGISTER_ENDPOINT, {
+      method: 'POST',
+      body: fd,
+      
+    });
+
+    if (!response.ok) {
+      let errorBody = null;
+      try { 
+        errorBody = await response.json(); 
+      } catch (_) { 
+        // If JSON parsing fails, use status text
+      }
+      throw new Error(errorBody?.message || `Server returned ${response.status}`);
+    }
+
+    const result = await response.json();
+    Alert.alert('Success', 'Partner registration submitted successfully. We will review and contact you.');
+    router.replace('/(partners)/auth/partnerWaitingScreen');
+
+  } catch (err: any) {
+    console.error('submitPartnerToServer error:', err);
+    throw err; // Re-throw to be handled by caller
+  }
+}
 
   const handleAddPhoto = (file: any | null) => {
     if (!file) return;
@@ -246,7 +315,7 @@ const PartnerSignup = () => {
                   <Text style={styles.mainTitle}>Partner Registration</Text>
                   <Text style={styles.subtitle}>Join our delivery network</Text>
                 </View>
-                <TouchableOpacity onPress={()=> router.push('/(partners)/(tabs)/home')} ><Text>Home</Text></TouchableOpacity>
+                {/* <TouchableOpacity onPress={()=> router.push('/(partners)/(tabs)/home')} ><Text>Home</Text></TouchableOpacity> */}
               </View>
             </LinearGradient>
           </View>
@@ -298,7 +367,7 @@ const PartnerSignup = () => {
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Contact Number</Text>
                   <TextInput
-                    placeholder="+1 234 567 8900"
+                    placeholder="+237 656-xxx-xxx"
                     keyboardType="phone-pad"
                     style={[styles.input, errors.phone && styles.inputError]}
                     value={value}
@@ -312,18 +381,18 @@ const PartnerSignup = () => {
 
             <Controller
               control={control}
-              name="location"
+              name="address"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Location</Text>
                   <TextInput
                     placeholder="Mimboman, Santa-Lucia"
-                    style={[styles.input, errors.location && styles.inputError]}
+                    style={[styles.input, errors.address && styles.inputError]}
                     value={value}
                     onChangeText={onChange}
                     onBlur={onBlur}
                   />
-                  {errors.location && <Text style={styles.errorText}>{errors.location.message}</Text>}
+                  {errors.address && <Text style={styles.errorText}>{errors.address.message}</Text>}
                 </View>
               )}
             />
@@ -365,6 +434,49 @@ const PartnerSignup = () => {
                 </View>
               )}
             />
+
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Password</Text>
+                  <TextInput
+                    placeholder="password (min 6 characters)"
+                    secureTextEntry={true}
+                    style={[styles.input, errors.password && styles.inputError]}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    autoCapitalize="none"
+                  />
+                  {errors.password && <Text style={styles.errorText}>{errors.password.message}</Text>}
+                </View>
+              )}
+            />
+
+            {/* Add Description field after password */}
+            <Controller
+              control={control}
+              name="description"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Business Description</Text>
+                  <TextInput
+                    placeholder="Tell us about your business, cuisine, specialties..."
+                    multiline
+                    numberOfLines={4}
+                    style={[styles.input, styles.textArea, errors.description && styles.inputError]}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    textAlignVertical="top"
+                  />
+                  {errors.description && <Text style={styles.errorText}>{errors.description.message}</Text>}
+                </View>
+              )}
+            />
+
 
             {/* Business Hours Section */}
             <View style={styles.section}>
@@ -769,6 +881,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
   },
+  textArea: {
+    height: 50,
+    textAlignVertical: 'top'
+  }
 });
 
 export default PartnerSignup;

@@ -41,6 +41,7 @@ const userSchema = mongoose.Schema({
     status: {
         type: String,
         enum: ["active", "suspended"],
+        default: "active"
     },
     address: {
         type: String,
@@ -59,7 +60,7 @@ const userSchema = mongoose.Schema({
   },
     verified: {
         type: Boolean, // Corrected type
-        default: true,
+        default: false
     },
     verificationCode: {
         type: String,

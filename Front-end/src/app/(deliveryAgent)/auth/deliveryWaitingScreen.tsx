@@ -4,16 +4,22 @@ import React from 'react'
 
 const deliveryWaitingScreen = () => {
   return (
-    <View>
-        
-      <View>
-        <WaitingScreen userType="delivery" />
-        <Text>Delivery Agent</Text>
-      </View>
+    <View style={styles.container}>
+      <WaitingScreen userType="delivery" />
     </View>
   )
 }
 
 export default deliveryWaitingScreen
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff', // Add background color
+  },
+  text: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+  }
+})

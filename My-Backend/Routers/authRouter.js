@@ -2,16 +2,21 @@
 const express = require('express');
 const router = express.Router();
 const authCtrl = require('../Controllers/authController');
-const upload = require('../Middlewares/uploadMiddleWare'); // Assuming you have a middleware for file uploads
+const { createMulter } = require('../Middlewares/multerConfig'); // Assuming you have a middleware for file uploads
 
 // Use multer if you want file uploads (partner/delivery docs) as described earlier
-// const upload = require('../middleware/upload');
-// router.post('/register', upload.fields([{ name: 'partnerDocs' }, { name: 'deliveryDocs' }]), authCtrl.register);
+const upload = createMulter(20 * 1024 * 1024).fields([
+  { name: 'partnerDocs', maxCount: 5 },
+  { name: 'deliveryDocs', maxCount: 5 },
+  { name: 'profilePhoto', maxCount: 1 },
+  { name: 'licensePhotos', maxCount: 5 },
+  { name: 'IDcard', maxCount: 1 },
+  {name: 'menuImages', maxCount: 5},
+  {}
 
-router.post('/register',upload.fields([
-    { name: 'partnerDocs', maxCount: 5 },
-    { name: 'deliveryDocs', maxCount: 5 }
-  ]), authCtrl.register);
+])
+
+router.post('/register',upload, authCtrl.register);
 router.post('/login', authCtrl.login);
 router.post('/resetPassword', authCtrl.ResetPassword);
 router.post('/verification', authCtrl.VerifyOtp);

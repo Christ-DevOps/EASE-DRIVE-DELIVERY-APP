@@ -15,18 +15,18 @@ const Partnerschema = mongoose.Schema({
         type: {
             type: String,
             enum: ['Point'],
-            required: true
+            required: false
         },
         coordinates: {
             type: [Number], // [longitude, latitude]
-            required: true
+            required: false
         }
     },
     category: {
         type: [String],
         required: true
     },
-    Description:{
+    description:{
         type: String,
         required: true
     },
@@ -47,7 +47,8 @@ const Partnerschema = mongoose.Schema({
     },
     Logistics: {
         type: Boolean,
-        required: true
+        default: true,
+        required: false
     },
     BankAccount:{
         type: String,

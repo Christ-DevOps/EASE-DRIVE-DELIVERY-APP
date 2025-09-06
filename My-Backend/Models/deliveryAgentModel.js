@@ -11,6 +11,16 @@ const deliveryAgentSchema = new mongoose.Schema({
   documents: {
     type:[ String]
   },
+  profilePhoto:{
+    type: String,
+  },
+  name:{
+    type: String
+  },
+  licenseDocs:{
+    type: [String],
+    default: []
+  },
   IDcard: {
     type: String,
   },
@@ -18,8 +28,9 @@ const deliveryAgentSchema = new mongoose.Schema({
     type: String,
     default: 'Motor-Bike'
   },
-  vehicleLicense:{
-    type: String
+  vehicleImmatriculation:{
+    type: String,
+    required: true
   },
     // GeoJSON Point: { type: 'Point', coordinates: [lng, lat] }
   currentLocation: {
@@ -35,16 +46,13 @@ const deliveryAgentSchema = new mongoose.Schema({
   },
   availabilityStatus: {
     type: String,
-    enum: ['available', 'offline'],
-    default: 'available'
+    enum: ['available', 'offline', 'on-delivery'],
+    default: 'offline'
   },
   currentOrder: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order'
-  },
-  isActive: {
-    type: Boolean,
-    default: true
+    ref: 'Order',
+
   },
   rating: {
     type: Number,

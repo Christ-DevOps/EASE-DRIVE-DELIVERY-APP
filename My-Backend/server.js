@@ -12,6 +12,7 @@ const orderRouter = require('./Routers/orderRouter');
 const cartRouter = require('./Routers/cartRouter');
 const productRouter = require('./Routers/productRouter');
 const searchRouter = require('./Routers/searchRouter');
+const partnerRouter = require('./Routers/partnerRouter');
 const connectDB = require('./config/db');
 
 dotenv.config();
@@ -30,6 +31,7 @@ app.use('/api/orders', orderRouter);
 app.use('/api/cart', cartRouter);
 app.use('/api/products', productRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/partner', partnerRouter)
 
 // example admin route
 const protect = require('./Middlewares/authMiddleWare');

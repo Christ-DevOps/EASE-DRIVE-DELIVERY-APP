@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const User = require('../Models/UserModel');
 const Partner = require('../Models/PartnerModel');
 const DeliveryAgent = require('../Models/deliveryAgentModel');
+const { safeUnlink } = require('../Utils/fileUtils');
 
 dotenv.config();
 
@@ -12,6 +13,7 @@ const signToken = (id, role) => {
     expiresIn: process.env.JWT_EXPIRES_IN || '30d' 
   });
 };
+
 
 // New endpoint to verify restaurant existence
 exports.verifyRestaurant = async (req, res) => {
@@ -47,12 +49,16 @@ exports.verifyRestaurant = async (req, res) => {
 };
 
 exports.register = async (req, res) => {
+  let user = null;
+  // collect paths of any files saved to disk so we can remove them on rollback
+  const uploadedPaths = [];
+
   try {
     const body = req.body || {};
     const files = req.files || {};
     const role = (body.role || 'client').toLowerCase();
 
-    // Validate required fields
+    // Basic required fields (common)
     if (!body.name || !body.email || !body.phone || !body.password || !body.address) {
       return res.status(400).json({ message: 'all fields are required' });
     }
@@ -61,16 +67,34 @@ exports.register = async (req, res) => {
       return res.status(403).json({ message: 'Cannot register as admin' });
     }
 
-    // Check for existing user
-    const existingUser = await User.findOne({
-      $or: [{ email: body.email }, { phone: body.phone }]
-    });
-
+    // Duplicate user check
+    const existingUser = await User.findOne({ $or: [{ email: body.email }, { phone: body.phone }] });
     if (existingUser) {
       return res.status(400).json({ message: 'user already exists with these info' });
     }
 
-    // Create user document
+    // Pre-validate role-specific required values BEFORE creating the User record
+    if (role === 'partner') {
+      if (!body.BankAccount || !body.description || !body.foodcategory ) {
+        return res.status(400).json({ message: 'all fields are required for partner' });
+      }
+    }
+
+    if (role === 'delivery_agent') {
+      if (!body.vehicleType || !body.vehicleImmatriculation || !body.IDcard) {
+        return res.status(400).json({
+          message: 'All fields are required to be filled for delivery agents'
+        });
+      }
+
+      // ensure file fields exist (multer should populate these)
+      const profileFile = files.profilePhoto && files.profilePhoto[0];
+      const licenseFiles = files.licensePhotos || [];
+      if (!profileFile) return res.status(400).json({ message: 'Profile photo is required' });
+      if (licenseFiles.length < 2) return res.status(400).json({ message: 'Please upload at least 2 license photos (front and back)' });
+    }
+
+    // Prepare user data
     const userData = {
       name: body.name,
       email: body.email,
@@ -81,103 +105,117 @@ exports.register = async (req, res) => {
       verified: false
     };
 
-    // Handle location (optional)
+    // Optional geo point
     if (body.lat && body.lng) {
       const lat = parseFloat(body.lat);
       const lng = parseFloat(body.lng);
       if (!isNaN(lat) && !isNaN(lng)) {
-        userData.location = {
-          type: 'Point',
-          coordinates: [lng, lat]
-        };
+        userData.location = { type: 'Point', coordinates: [lng, lat] };
       }
     }
 
-    // Create user (single document)
-    const user = await User.create(userData);
+    // Create User
+    user = await User.create(userData);
 
     let partner = null;
     let deliveryAgent = null;
 
-    // If role is partner, create Partner document
+    // PARTNER flow
     if (role === 'partner') {
-      if ( !body.BankAccount || !body.description || !body.foodcategory || !body.restaurantLocation) {
-        await User.findByIdAndDelete(user._id).catch(() => {});
-        return res.status(400).json({ message: 'all fields are required for partner' });
-      }
-
       const partnerData = {
         user: user._id,
-        restaurantName: userData.name,
+        // Use restaurant name from body (not user name)
+        restaurantName: body.restaurantName || body.restaurant || userData.name,
         description: body.description || '',
         address: body.restaurantLocation || body.address,
-        categories: body.foodcategory ?
-          body.foodcategory.split(',').map(s => s.trim()).filter(Boolean) : [],
-        bankAccount: body.BankAccount,
+        categories: body.foodcategory ? body.foodcategory.split(',').map(s => s.trim()).filter(Boolean) : [],
+        BankAccount: body.BankAccount,
         approved: false
       };
 
-      // Handle partner documents (multer/other)
+      // partner docs (if any)
       if (files.partnerDocs && files.partnerDocs.length > 0) {
-        partnerData.documents = files.partnerDocs.map(file => file.path);
+        partnerData.documents = files.partnerDocs.map(f => {
+          const p = f.path || f.location || f.filename;
+          if (p) uploadedPaths.push(p);
+          return p;
+        });
       }
 
       partner = await Partner.create(partnerData);
     }
 
-    // If role is delivery_agent, create DeliveryAgent document
+    // DELIVERY AGENT flow
     if (role === 'delivery_agent') {
-      if (!body.vehicleType || !body.vehiclelicense) {
-        await User.findByIdAndDelete(user._id).catch(() => {});
-        return res.status(400).json({
-          message: 'Vehicle type and license number are required for delivery agents'
-        });
+      const profileFile = files.profilePhoto && files.profilePhoto[0];
+      const licenseFiles = files.licensePhotos || [];
+
+      // Defensive check: if multer didn't provide expected files (shouldn't happen if validated earlier)
+      if (!profileFile || licenseFiles.length < 2) {
+        // collect any provided paths and cleanup
+        if (profileFile && profileFile.path) uploadedPaths.push(profileFile.path);
+        licenseFiles.forEach(f => f.path && uploadedPaths.push(f.path));
+        // delete uploaded files + user
+        uploadedPaths.forEach(p => safeUnlink(p));
+        try { await User.findByIdAndDelete(user._id); } catch (e) { console.warn('cleanup user delete failed', e); }
+        return res.status(400).json({ message: 'Missing required files (profilePhoto and at least 2 licensePhotos)' });
       }
 
+      // push saved file paths to uploadedPaths for rollback use
+      const profilePath = profileFile.path || profileFile.location || profileFile.filename;
+      if (profilePath) uploadedPaths.push(profilePath);
+      const licensePaths = licenseFiles.map(f => {
+        const p = f.path || f.location || f.filename;
+        if (p) uploadedPaths.push(p);
+        return p;
+      });
+
+      // Optional restaurant association validation
       let restaurantId = null;
-      
-      // Handle restaurant association (optional)
       if (body.restaurantName) {
         const restaurant = await Partner.findOne({
           restaurantName: { $regex: new RegExp(body.restaurantName.trim(), 'i') },
           approved: true
         });
-        
         if (!restaurant) {
-          await User.findByIdAndDelete(user._id).catch(() => {});
-          return res.status(400).json({ 
-            message: 'Restaurant not found or not approved. Please verify the restaurant name.' 
+          // cleanup files + user
+          uploadedPaths.forEach(p => safeUnlink(p));
+          try { await User.findByIdAndDelete(user._id); } catch (e) { console.warn('cleanup user delete failed', e); }
+          return res.status(400).json({
+            message: 'Restaurant not found or not approved. Please verify the restaurant name.'
           });
         }
-        
         restaurantId = restaurant._id;
       }
 
+      console.log('Newly registered delivery_Agent', user._id, restaurantId, body.vehicleType, body.vehicleImmatriculation, body.IDcard, licenseFiles, profileFile, userData.email, userData.password)
+
       const deliveryAgentData = {
         user: user._id,
-        restaurant: restaurantId, // Can be null for independent drivers
+        name: userData.name,
+        restaurant: restaurantId, // null if independent
         vehicleType: body.vehicleType,
-        licenseNumber: body.vehiclelicense,
-        approved: false
+        vehicleImmatriculation: body.vehicleImmatriculation,
+        IDcard: body.IDcard,
+        licensePhotos: licensePaths,
+        profilePhoto: profilePath,
+        approved: false,
+        documents: [profilePath, ...licensePaths]
       };
-
-      // Handle delivery agent documents
-      if (files.deliveryDocs && files.deliveryDocs.length > 0) {
-        deliveryAgentData.documents = files.deliveryDocs.map(file => file.path);
-      }
 
       try {
         deliveryAgent = await DeliveryAgent.create(deliveryAgentData);
       } catch (error) {
-        // If delivery agent creation fails, cleanup user
-        await User.findByIdAndDelete(user._id).catch(() => {});
-        throw error;
+        // cleanup files + user
+        uploadedPaths.forEach(p => safeUnlink(p));
+        try { await User.findByIdAndDelete(user._id); } catch (e) { console.warn('cleanup user delete failed', e); }
+        throw error; // will be handled by outer catch
       }
     }
 
+    // Success -> sign token and respond
     const token = signToken(user._id, user.role);
 
-    // Prepare response
     const responseData = {
       user: {
         id: user._id,
@@ -202,10 +240,7 @@ exports.register = async (req, res) => {
       let restaurantInfo = null;
       if (deliveryAgent.restaurant) {
         const restaurant = await Partner.findById(deliveryAgent.restaurant);
-        restaurantInfo = restaurant ? {
-          id: restaurant._id,
-          name: restaurant.restaurantName
-        } : null;
+        restaurantInfo = restaurant ? { id: restaurant._id, name: restaurant.restaurantName } : null;
       }
 
       responseData.deliveryAgent = {
@@ -220,6 +255,18 @@ exports.register = async (req, res) => {
     return res.status(201).json(responseData);
   } catch (err) {
     console.error('REGISTER ERROR:', err);
+
+    // Attempt cleanup: delete created user and any uploaded files we tracked
+    try {
+      if (uploadedPaths.length > 0) uploadedPaths.forEach(p => safeUnlink(p));
+    } catch (e) {
+      console.warn('error during unlink cleanup', e);
+    }
+
+    if (user && user._id) {
+      try { await User.findByIdAndDelete(user._id); } catch (e) { console.warn('cleanup user delete failed', e); }
+    }
+
     return res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

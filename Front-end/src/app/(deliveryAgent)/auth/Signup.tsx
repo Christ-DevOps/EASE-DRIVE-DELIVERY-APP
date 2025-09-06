@@ -31,7 +31,7 @@ import * as yup from 'yup';
  * - Partner check endpoint used: POST `${API_BASE_URL}/api/partners/check-exists`
  * - Register endpoint used: POST `${API_BASE_URL}/api/auth/register`
  */
-const API_BASE_URL = __DEV__ ? 'http://192.168.100.54:5000' : 'https://your-production-api.com';
+const API_BASE_URL = __DEV__ ? 'http://10.171.8.152:5000' : 'https://your-production-api.com';
 const PARTNER_CHECK = `${API_BASE_URL}/api/partners/check-exists`;
 const REGISTER_ENDPOINT = `${API_BASE_URL}/api/auth/register`;
 
@@ -46,7 +46,8 @@ const DeliverySchema = yup.object().shape({
     .required('Password is required')
     .min(6, 'Password must be at least 6 characters'),
   vehicle_type: yup.string().required('Vehicle type is required'),
-  license_number: yup.string()
+  Immatriculation: yup.string().required('Vehicle registration is required'),
+  IDcard: yup.string()
     .required('License number is required')
     .min(3, 'Must be at least 3 characters'),
   restaurant_name: yup.string().when('has_restaurant', {
@@ -65,7 +66,8 @@ type FormValues = {
   address: string;
   password: string;
   vehicle_type: string;
-  license_number: string;
+  Immatriculation: string;
+  IDcard: string;
   restaurant_name?: string;
   has_restaurant?: boolean;
 };
@@ -77,11 +79,12 @@ export default function DeliverySignup() {
     resolver: yupResolver(DeliverySchema),
     defaultValues: {
       name: '', email: '', phone: '', address: '', password: '',
-      vehicle_type: '', license_number: '', restaurant_name: '', has_restaurant: false
+      vehicle_type: '',Immatriculation: '', IDcard: '', restaurant_name: '', has_restaurant: false
     }
   });
 
   // UI state
+  const [profilePhoto, setProfilePhoto] = useState<any>(null);
   const [licensePhotos, setLicensePhotos] = useState<any[]>([]);
   const [hasRestaurant, setHasRestaurant] = useState(false);
   const [restaurantVerifying, setRestaurantVerifying] = useState(false);
@@ -92,20 +95,41 @@ export default function DeliverySignup() {
   // password toggle
   const [showPassword, setShowPassword] = useState(false);
 
+  //handles profile photo upload
+  const handleAddProfilePhoto = (file: any | null) => {
+    if (!file) return; 
+    if(file.size && file.size > MAX_FILE_SIZE) {
+      Alert.alert('File too large', 'Please upload files smaller than 20 MB.');
+      return;
+    }
+    setProfilePhoto(file);
+  };
+
+  //handle license photos upload
+  const handleAddLicensePhoto = (file: any | null) => {
+    if (!file) return;
+    if(file.size && file.size > MAX_FILE_SIZE) {
+      Alert.alert('File too large', 'Please upload files smaller than 20 MB.');
+      return;
+    }
+    setLicensePhotos(prev =>
+    {
+      if (prev.length >= 4) {
+        Alert.alert('Limit reached', 'You can upload up to 4 license photos.');
+        return prev;
+    }
+      return [...prev, file]
+    });
+  };
+
   // Watch restaurant name (debounce)
   const watchRestaurantName = watch('restaurant_name', '');
   const verifyTimeout = useRef<number | null>(null);
   const lastCheckedName = useRef<string | null>(null);
 
-  const handleAddPhoto = (file: any | null) => {
-    if (!file) return;
-    if (file.size && file.size > MAX_FILE_SIZE) {
-      Alert.alert('File too large', 'Please upload files smaller than 20 MB.');
-      return;
-    }
-    setLicensePhotos(prev => [...prev, file]);
-  };
-  const handleRemovePhotoAt = (idx: number) => setLicensePhotos(prev => prev.filter((_, i) => i !== idx));
+  //remove photo at index
+const handleRemoveLicenseAt = (idx: number) => setLicensePhotos(prev => prev.filter((_, i) => i !== idx));
+const handleRemoveProfilePhoto = () => setProfilePhoto(null);
 
   const handleRestaurantToggle = (v: boolean) => {
     setHasRestaurant(v);
@@ -194,6 +218,25 @@ export default function DeliverySignup() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
+      if (!profilePhoto) {
+        Alert.alert('Missing photo', 'Please upload a personal profile photo.');
+        setLoading(false);
+        clearTimeout(timeoutId);
+        return;
+      }
+      if(licensePhotos.length < 3) {
+        Alert.alert('Incomplete upload', 'Please upload all required license photos (front and back). You may add a 3rd if needed.');
+        setLoading(false);
+        clearTimeout(timeoutId);
+        return;
+      }
+      if(licensePhotos.length > 4) {
+        Alert.alert('Too many files', 'You can upload up to 4 license photos.');
+        setLoading(false);
+        clearTimeout(timeoutId);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('name', data.name);
       formData.append('email', data.email);
@@ -202,7 +245,8 @@ export default function DeliverySignup() {
       formData.append('password', data.password);
       formData.append('role', 'delivery_agent');
       formData.append('vehicleType', data.vehicle_type);
-      formData.append('vehiclelicense', data.license_number);
+      formData.append('vehicleImmatriculation', data.Immatriculation);
+      formData.append('IDcard', data.IDcard);
 
       if (hasRestaurant && verifiedPartnerId) {
         formData.append('restaurantId', verifiedPartnerId);
@@ -213,14 +257,18 @@ export default function DeliverySignup() {
         formData.append('restaurantId', '');
       }
 
-      licensePhotos.forEach((p: any, i: number) => {
-        const file = {
-          uri: p.uri,
-          name: p.name || `license_${i}.jpg`,
-          type: p.type || 'image/jpeg'
-        } as unknown as any;
-        formData.append('deliveryDocs', file);
+      //helper to pass image
+      const makeFileObject = (file:any, fallbackName: string) => ({
+        uri: file.uri,
+        name: file.name || fallbackName,
+        type: file.type || 'jpeg/image'
       });
+
+      formData.append('profilePhoto', makeFileObject(profilePhoto, 'profile.jpg'));
+      licensePhotos.forEach((p:any, i:number) => {
+        formData.append('licensePhotos', makeFileObject(p, `license-${i+1}.jpg`)); 
+      })
+
 
       const res = await fetch(REGISTER_ENDPOINT, {
         method: 'POST',
@@ -315,7 +363,7 @@ export default function DeliverySignup() {
                 <Text style={styles.label}>Phone Number</Text>
                 <View style={styles.iconInput}>
                   <Ionicons name="call" size={20} color="#6B7280" style={styles.leftIcon} />
-                  <TextInput placeholder="+237 6..." keyboardType="phone-pad" style={[styles.input, errors.phone && styles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} />
+                  <TextInput placeholder="+237 680-xxx-xxx" keyboardType="phone-pad" style={[styles.input, errors.phone && styles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} />
                 </View>
                 {errors.phone && <Text style={styles.errorText}>{errors.phone.message}</Text>}
               </View>
@@ -360,15 +408,27 @@ export default function DeliverySignup() {
               </View>
             )} />
 
-            {/* License number */}
-            <Controller control={control} name="license_number" render={({ field: { onChange, onBlur, value } }) => (
+            {/* Immatriculation */}
+            <Controller control={control} name='Immatriculation' render={({ field: { onChange, onBlur, value } }) => (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Driving License Number</Text>
+                <Text style={styles.label}>Vehicle Immatriculation</Text>
+                <View style={styles.iconInput}>
+                  <Ionicons name="reader" size={20} color="#6B7280" style={styles.leftIcon} />
+                  <TextInput placeholder="AB123CD" style={[styles.input, errors.Immatriculation && styles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} />
+                </View>
+                {errors.Immatriculation && <Text style={styles.errorText}>{errors.Immatriculation.message}</Text>}
+              </View>
+            )} />
+
+            {/* License number */}
+            <Controller control={control} name="IDcard" render={({ field: { onChange, onBlur, value } }) => (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>ID Card Number</Text>
                 <View style={styles.iconInput}>
                   <Ionicons name="card" size={20} color="#6B7280" style={styles.leftIcon} />
-                  <TextInput placeholder="DL12345678" style={[styles.input, errors.license_number && styles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} />
+                  <TextInput placeholder="DL12345678" style={[styles.input, errors.IDcard && styles.inputError]} value={value} onChangeText={onChange} onBlur={onBlur} />
                 </View>
-                {errors.license_number && <Text style={styles.errorText}>{errors.license_number.message}</Text>}
+                {errors.IDcard && <Text style={styles.errorText}>{errors.IDcard.message}</Text>}
               </View>
             )} />
 
@@ -406,25 +466,39 @@ export default function DeliverySignup() {
             </View>
 
             {/* Uploads */}
-            <View style={styles.uploadSection}>
-              <Text style={styles.sectionTitle}>Required Documents</Text>
-              <View style={styles.uploadCard}>
-                <Text style={styles.uploadLabel}>Driver's Profile Photo & License Photo</Text>
-                <UploadField type="image" onChange={handleAddPhoto} maxFileSize={MAX_FILE_SIZE} />
-                {licensePhotos.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosContainer}>
-                    {licensePhotos.map((p, idx) => (
-                      <View key={idx} style={styles.photoItem}>
-                        <Image source={{ uri: p.uri }} style={styles.photoThumb} />
-                        <TouchableOpacity style={styles.removePhotoBtn} onPress={() => handleRemovePhotoAt(idx)}>
-                          <Ionicons name="close-circle" size={22} color="#FF3B30" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
+            <View style={styles.uploadCard}>
+              <Text style={styles.uploadLabel}>Personal Profile Photo</Text>
+              <UploadField type="image" onChange={handleAddProfilePhoto} maxFileSize={MAX_FILE_SIZE} />
+              {profilePhoto ? (
+                <View style={[styles.photoItem, { marginTop: 8 }]}>
+                  <Image source={{ uri: profilePhoto.uri }} style={styles.photoThumb} />
+                  <TouchableOpacity style={styles.removePhotoBtn} onPress={handleRemoveProfilePhoto}>
+                    <Ionicons name="close-circle" size={22} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>Upload a clear face photo</Text>
+              )}
             </View>
+
+            <View style={[styles.uploadCard, { marginTop: 12 }]}>
+              <Text style={styles.uploadLabel}>Driver's License (Front & Back)</Text>
+              <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>Upload 2 photos (front + back). You may add a 3rd if needed.</Text>
+              <UploadField type="image" onChange={handleAddLicensePhoto} maxFileSize={MAX_FILE_SIZE} />
+              {licensePhotos.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosContainer}>
+                  {licensePhotos.map((p, idx) => (
+                    <View key={idx} style={styles.photoItem}>
+                      <Image source={{ uri: p.uri }} style={styles.photoThumb} />
+                      <TouchableOpacity style={styles.removePhotoBtn} onPress={() => handleRemoveLicenseAt(idx)}>
+                        <Ionicons name="close-circle" size={22} color="#FF3B30" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
 
             <TouchableOpacity style={[styles.submitButton, (isSubmitting || loading) && { opacity: 0.7 }]} onPress={handleSubmit(onSubmit)} disabled={isSubmitting || loading}>
               {(isSubmitting || loading) ? <ActivityIndicator color="white" /> : <Text style={styles.submitText}>Register as Agent</Text>}
