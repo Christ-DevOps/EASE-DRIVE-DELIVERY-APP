@@ -10,10 +10,6 @@ const {
   rejectDeliveryAgent,
   getRegistrationStats
 } = require('../Controllers/adminController');
-const { auth, admin } = require('../middleware/auth');
-
-// All routes require authentication and admin privileges
-router.use(auth, admin);
 
 // Get registration statistics
 router.get('/stats', getRegistrationStats);

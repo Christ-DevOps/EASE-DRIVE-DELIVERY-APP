@@ -23,11 +23,11 @@ const DeliverySchema = mongoose.Schema({
         }
     },
     pickedupAt: {
-        type: date,
+        type: Date,
         required: false
     },
     deliveredAt: {
-        type: date,
+        type: Date,
         required: false
     },
     status: {

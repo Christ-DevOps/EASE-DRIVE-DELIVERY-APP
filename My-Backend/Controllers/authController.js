@@ -276,61 +276,102 @@ exports.register = async (req, res) => {
   }
 };
 
+// login function
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    // Validation
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password required' });
     }
 
+    // Find user with password field (normally excluded in schema)
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // For partners and delivery agents, fetch additional data
+    // Check if user is verified
+    if (!user.verified) {
+      return res.status(403).json({ 
+        message: 'Account not verified. Please wait for admin approval.' 
+      });
+    }
+
+    // Role-specific data and validation
     let additionalData = {};
+    let requiresApproval = false;
+
     if (user.role === 'partner') {
       const partner = await Partner.findOne({ user: user._id });
       if (partner) {
         additionalData.partner = {
           id: partner._id,
           restaurantName: partner.restaurantName,
-          description: partner.description,
-          address: partner.address,
-          categories: partner.categories,
           approved: partner.approved
         };
+        
+        if (!partner.approved) {
+          requiresApproval = true;
+          return res.status(403).json({
+            message: 'Partner account pending approval',
+            requiresApproval: true,
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            }
+          });
+        }
       }
     } else if (user.role === 'delivery_agent') {
       const deliveryAgent = await DeliveryAgent.findOne({ user: user._id })
         .populate('restaurant', 'restaurantName address');
+      
       if (deliveryAgent) {
         additionalData.deliveryAgent = {
           id: deliveryAgent._id,
-          vehicleType: deliveryAgent.vehicleType,
-          licenseNumber: deliveryAgent.licenseNumber,
-          restaurant: deliveryAgent.restaurant,
           approved: deliveryAgent.approved,
-          isIndependent: !deliveryAgent.restaurant
+          vehicleType: deliveryAgent.vehicleType,
+          restaurant: deliveryAgent.restaurant
         };
+        
+        if (!deliveryAgent.approved) {
+          requiresApproval = true;
+          return res.status(403).json({
+            message: 'Delivery agent account pending approval',
+            requiresApproval: true,
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            }
+          });
+        }
       }
     }
 
+    // Generate JWT token with role information
     const token = signToken(user._id, user.role);
     
-    res.json({ 
+    // Successful login response
+    res.json({
       user: { 
         id: user._id, 
         name: user.name, 
         email: user.email, 
         phone: user.phone,
-        role: user.role 
+        role: user.role,
+        verified: user.verified
       },
       ...additionalData,
       token 

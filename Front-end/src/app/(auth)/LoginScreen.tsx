@@ -50,7 +50,7 @@ type FormData = {
 // - iOS simulator: "http://localhost:5000"
 // - Physical device: use your computer LAN IP e.g. "http://192.168.1.50:5000"
 // If deployed, set the HTTPS URL: "https://api.yourdomain.com"
-const API_BASE_URL = __DEV__ ? 'http://192.168.100.54:5000' : 'https://your-production-api.com';
+const API_BASE_URL =  'http://192.168.100.54:5000';
 // Replace the path below if your backend login route differs
 const LOGIN_ENDPOINT = `${API_BASE_URL}/api/auth/login`; // <-- adjust if needed
 
@@ -78,83 +78,82 @@ const Login = () => {
     Alert.alert(title, message, [{ text: 'OK' }]);
   };
 
-  // Submit handler that calls backend
-  const onSubmit = async (data: FormData) => {
-    setLoading(true);
+// Login.tsx - Updated submit handler
+const onSubmit = async (data: FormData) => {
+  setLoading(true);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
-    // Abort controller to implement timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s
+  try {
+    const res = await fetch(LOGIN_ENDPOINT, {
+      method: 'POST',
+      signal: controller.signal,
+      // headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, password: data.password })
+    });
 
-    try {
-      const res = await fetch(LOGIN_ENDPOINT, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password
-        })
-      });
+    clearTimeout(timeout);
+    const responseData = await res.json();
 
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        // try to parse body for message
-        let errBody = null;
-        try { errBody = await res.json(); } catch (e) { /* ignore */ }
-
-        if (res.status === 401 || res.status === 400) {
-          const msg = errBody?.message || 'Invalid credentials';
-          showAlert('Login failed', msg);
-        } else {
-          const msg = errBody?.message || 'Unexpected server error';
-          showAlert('Server error', msg);
-        }
-        setLoading(false);
+    if (!res.ok) {
+      // Handle approval pending cases
+      if (res.status === 403 && responseData.requiresApproval) {
+        await AsyncStorage.setItem('pendingUser', JSON.stringify(responseData.user));
+        router.replace('/(deliveryAgent)/auth/deliveryWaitingScreen');
         return;
       }
-
-      const body = await res.json();
-      // Expecting { token, user, ... } from your backend
-      const token = body.token || body.accessToken;
-      const user = body.user || null;
-
-      if (!token) {
-        showAlert('Login error', 'No token returned from server.');
-        setLoading(false);
-        return;
-      }
-
-      // Persist token & user
-      await AsyncStorage.setItem('token', token);
-      if (user) {
-        await AsyncStorage.setItem('user', JSON.stringify(user));
-      }
-
-      // Navigate to main app (adjust route to your app)
-      router.replace('/(Client)/(tabs)');
-
-    } catch (err: any) {
-      // Distinguish common errors
-      if (err.name === 'AbortError') {
-        showAlert('Timeout', 'Request timed out. Try again or check your network.');
-      } else if (err.message && err.message.includes('Network request failed')) {
-        // Very common in Expo -> wrong host/IP
-        showAlert(
-          'Network Error',
-          `Cannot reach the server. If you're running the backend locally, ensure API_BASE_URL is your computer's LAN IP and that the backend is running. On Android emulator use 10.0.2.2.`
-        );
-      } else {
-        showAlert('Error', err.message || 'An unknown error occurred.');
-      }
-    } finally {
-      clearTimeout(timeout);
-      setLoading(false);
+      
+      const msg = responseData?.message || 'Login failed';
+      showAlert('Error', msg);
+      return;
     }
-  };
+
+    // Successful login
+    const { token, user, partner, deliveryAgent } = responseData;
+    
+    // Store authentication data
+    await AsyncStorage.setItem('token', token);
+    await AsyncStorage.setItem('user', JSON.stringify(user));
+    
+    if (partner) {
+      await AsyncStorage.setItem('partner', JSON.stringify(partner));
+    }
+    
+    if (deliveryAgent) {
+      await AsyncStorage.setItem('deliveryAgent', JSON.stringify(deliveryAgent));
+    }
+
+    // Redirect based on user role
+    switch (user.role) {
+      case 'admin':
+        router.replace('/(admin)/(tabs)/Dashboard');
+        break;
+      case 'partner':
+        router.replace('/(partners)/(tabs)/home');
+        break;
+      case 'delivery_agent':
+        router.replace('/(deliveryAgent)/(tabs)/Home');
+        break;
+      case 'client':
+      default:
+        router.replace('/(Client)/(tabs)');
+        break;
+    }
+
+  } catch (err: any) {
+    clearTimeout(timeout);
+    
+    if (err.name === 'AbortError') {
+      showAlert('Timeout', 'Request timed out. Please try again.');
+    } else if (err.message.includes('Network request failed')) {
+      showAlert('Network Error', 'Cannot connect to the server. Please check your connection.');
+    } else {
+      showAlert('Error', err.message || 'An unexpected error occurred.');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!loaded) return null;
 
@@ -186,7 +185,7 @@ const Login = () => {
                 <View style={styles.titleContainer}>
                   <Text style={styles.mainTitle}>Welcome Back!</Text>   
                   <Text style={styles.subtitle}>Please login to continue</Text>
-                  <TouchableOpacity onPress={()=> router.replace('/(admin)/(tabs)/Dashboard')} ><Text>Admin</Text></TouchableOpacity>
+  
                 </View>
               </View>
             </LinearGradient>
